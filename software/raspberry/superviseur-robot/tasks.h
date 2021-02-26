@@ -93,7 +93,6 @@ private:
     RT_SEM sem_openComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
-    RT_SEM sem_battery;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -134,6 +133,11 @@ private:
      */
     void MoveTask(void *arg);
     
+     /**
+     * @brief TThread updating the monitor with the robot battery level.
+     */
+    void BatteryTask(void *arg);
+    
     /**********************************************************************/
     /* Queue services                                                     */
     /**********************************************************************/
@@ -150,20 +154,6 @@ private:
      * @return Message read
      */
     Message *ReadInQueue(RT_QUEUE *queue);
-    
-    
-    
-    
-    
-    /**
-     * CUSTOM METHODS
-     */
-    
-    
-     /**
-     * @brief Thread requesting robot batterie level.
-     */
-    void BatteryTask(void *arg) ;
 
 };
 
