@@ -76,6 +76,7 @@ private:
     RT_TASK th_openComRobot;
     RT_TASK th_startRobot;
     RT_TASK th_move;
+    RT_TASK th_battery;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -92,6 +93,7 @@ private:
     RT_SEM sem_openComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
+    RT_SEM sem_battery;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -148,6 +150,20 @@ private:
      * @return Message read
      */
     Message *ReadInQueue(RT_QUEUE *queue);
+    
+    
+    
+    
+    
+    /**
+     * CUSTOM METHODS
+     */
+    
+    
+     /**
+     * @brief Thread requesting robot batterie level.
+     */
+    void BatteryTask(void *arg) ;
 
 };
 
