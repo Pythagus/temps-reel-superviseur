@@ -34,6 +34,14 @@
 #include "camera.h"
 #include "img.h"
 
+#define CAMERA_SIZE sm
+#define CAMERA_FPS 20
+
+/**
+ * Enumerate for image mode
+ */
+enum e_imageMode {IMAGEMODE_IMG, IMAGEMODE_IMG_POS};
+
 using namespace std;
 
 class Tasks {
@@ -64,8 +72,11 @@ private:
     /**********************************************************************/
     ComMonitor monitor;
     ComRobot robot;
+    Camera camera{CAMERA_SIZE, CAMERA_FPS};
     int robotStarted = 0;
     int move = MESSAGE_ROBOT_STOP;
+    int isImagePeriodic = 0;
+    int imageMode = IMAGEMODE_IMG;
     
     /**********************************************************************/
     /* Tasks                                                              */
@@ -77,6 +88,8 @@ private:
     RT_TASK th_startRobot;
     RT_TASK th_move;
     RT_TASK th_battery;
+    RT_TASK th_camera;
+    RT_TASK th_image;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -85,6 +98,9 @@ private:
     RT_MUTEX mutex_robot;
     RT_MUTEX mutex_robotStarted;
     RT_MUTEX mutex_move;
+    RT_MUTEX mutex_camera;
+    RT_MUTEX mutex_isImagePeriodic;
+    RT_MUTEX mutex_imageMode;
 
     /**********************************************************************/
     /* Semaphores                                                         */
@@ -93,6 +109,8 @@ private:
     RT_SEM sem_openComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
+    RT_SEM sem_startCamera;
+    RT_SEM sem_closeCamera;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -156,9 +174,19 @@ private:
     void MoveTask(void *arg);
     
      /**
-     * @brief TThread updating the monitor with the robot battery level.
+     * @brief Thread updating the monitor with the robot battery level.
      */
     void BatteryTask(void *arg);
+    
+     /**
+     * @brief Thread opening and closing the camera.
+     */
+    void CameraTask(void *arg);
+    
+     /**
+     * @brief Thread sending an image to the monitor.
+     */
+    void ImageTask(void *arg);
     
     /**********************************************************************/
     /* Queue services                                                     */

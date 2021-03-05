@@ -25,8 +25,9 @@
 #define PRIORITY_TSENDTOMON 22
 #define PRIORITY_TRECEIVEFROMMON 25
 #define PRIORITY_TSTARTROBOT 20
-#define PRIORITY_TCAMERA 21
-#define PRIORITY_TBATTERY 17
+#define PRIORITY_TBATTERY 10
+#define PRIORITY_TCAMERA 19
+#define PRIORITY_TIMAGE 12
 
 /*
  * Some remarks:
@@ -59,6 +60,9 @@ void Tasks::Init() {
     CreateMutex(&mutex_robot);
     CreateMutex(&mutex_robotStarted);
     CreateMutex(&mutex_move);
+    CreateMutex(&mutex_camera);
+    CreateMutex(&mutex_isImagePeriodic);
+    CreateMutex(&mutex_imageMode);
     cout << "Mutexes created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -68,6 +72,8 @@ void Tasks::Init() {
     CreateSemaphore(&sem_openComRobot);
     CreateSemaphore(&sem_serverOk);
     CreateSemaphore(&sem_startRobot);
+    CreateSemaphore(&sem_startCamera);
+    CreateSemaphore(&sem_closeCamera);
     cout << "Semaphores created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -80,6 +86,8 @@ void Tasks::Init() {
     CreateTask(&th_startRobot, "th_startRobot", PRIORITY_TSTARTROBOT);
     CreateTask(&th_move, "th_move", PRIORITY_TMOVE);
     CreateTask(&th_battery, "th_battery", PRIORITY_TBATTERY);
+    CreateTask(&th_camera, "th_camera", PRIORITY_TCAMERA);
+    CreateTask(&th_image, "th_image", PRIORITY_TIMAGE);
     cout << "Tasks created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -103,6 +111,8 @@ void Tasks::Run() {
     RunTask(&th_startRobot,     (void(*)(void*)) & Tasks::StartRobotTask);
     RunTask(&th_move,           (void(*)(void*)) & Tasks::MoveTask);
     RunTask(&th_battery,        (void(*)(void*)) & Tasks::BatteryTask);
+    RunTask(&th_camera,         (void(*)(void*)) & Tasks::CameraTask);
+    RunTask(&th_image,          (void(*)(void*)) & Tasks::ImageTask);
 
     cout << "Tasks launched" << endl << flush;
 }
@@ -211,6 +221,11 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             move = msgRcv->GetID();
             rt_mutex_release(&mutex_move);
+        } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
+            cout << "[ReceiveFromMon] Received MESSAGE_CAM_OPEN" << endl;
+            rt_sem_v(&sem_startCamera);
+        } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
+            rt_sem_v(&sem_closeCamera);
         }
         delete(msgRcv); // mus be deleted manually, no consumer
     }
@@ -354,6 +369,92 @@ void Tasks::BatteryTask(void *arg) {
         }
     }
 }
+    
+/**
+* @brief Thread opening and closing the camera.
+*/
+void Tasks::CameraTask(void *arg) {
+    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
+    // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
+    
+    bool cameraOpened = false;
+    
+    /**************************************************************************************/
+    /* The task starts here                                                    */
+    /**************************************************************************************/
+    while (1) {
+        while (not cameraOpened) {
+            
+            rt_sem_p(&sem_startCamera, TM_INFINITE);
+
+            rt_mutex_acquire(&mutex_camera, TM_INFINITE);
+            bool status = camera.Open();
+            rt_mutex_release(&mutex_camera);
+        
+            if (status) {
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ACK));
+                cameraOpened = true;
+            } else {
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_NACK));
+            }
+        }
+        while (cameraOpened) {
+            rt_sem_p(&sem_closeCamera, TM_INFINITE);
+
+            rt_mutex_acquire(&mutex_camera, TM_INFINITE);
+            camera.Close();
+            bool status = not camera.IsOpen();
+            rt_mutex_release(&mutex_camera);
+        
+            if (status) {
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ACK));
+                cameraOpened = false;
+            } else {
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_NACK));
+            }
+        }
+    }
+}
+
+/**
+* @brief Thread sending an image to the monitor.
+*/
+void Tasks::ImageTask(void *arg) {/*
+    int localIsImagePeriodic;
+    int localImageMode;
+    
+    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
+    // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
+    
+    /**************************************************************************************/
+    /* The task starts here                                                               */
+    /**************************************************************************************/
+    /*
+    rt_task_set_periodic(NULL, TM_NOW, 100000000); // 100ms = 1e8 ns
+
+    while (1) {
+        rt_task_wait_period(NULL);
+        
+        rt_mutex_acquire(&mutex_isImagePeriodic, TM_INFINITE);
+        localIsImagePeriodic = isImagePeriodic;
+        rt_mutex_release(&mutex_isImagePeriodic);
+
+        if (localIsImagePeriodic) {
+            rt_mutex_acquire(&mutex_imageMode, TM_INFINITE);
+            localImageMode = imageMode;
+            rt_mutex_release(&mutex_imageMode);
+
+            if (localImageMode == IMAGEMODE_IMG) {
+
+            } else if (localImageMode == IMAGEMODE_IMG_POS) {
+
+            }
+        }
+    }*/
+}
+
 /**
  * Write a message in a given queue
  * @param queue Queue identifier
