@@ -52,91 +52,40 @@
  * semaphore, etc.)
  */
 void Tasks::Init() {
-    int status;
-    int err;
-
     /**************************************************************************************/
     /* 	Mutex creation                                                                    */
     /**************************************************************************************/
-    if (err = rt_mutex_create(&mutex_monitor, NULL)) {
-        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_mutex_create(&mutex_robot, NULL)) {
-        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_mutex_create(&mutex_robotStarted, NULL)) {
-        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_mutex_create(&mutex_move, NULL)) {
-        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    CreateMutex(&mutex_monitor);
+    CreateMutex(&mutex_robot);
+    CreateMutex(&mutex_robotStarted);
+    CreateMutex(&mutex_move);
     cout << "Mutexes created successfully" << endl << flush;
 
     /**************************************************************************************/
     /* 	Semaphors creation       							  */
     /**************************************************************************************/
-    if (err = rt_sem_create(&sem_barrier, NULL, 0, S_FIFO)) {
-        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_sem_create(&sem_openComRobot, NULL, 0, S_FIFO)) {
-        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_sem_create(&sem_serverOk, NULL, 0, S_FIFO)) {
-        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_sem_create(&sem_startRobot, NULL, 0, S_FIFO)) {
-        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    CreateSemaphore(&sem_barrier);
+    CreateSemaphore(&sem_openComRobot);
+    CreateSemaphore(&sem_serverOk);
+    CreateSemaphore(&sem_startRobot);
     cout << "Semaphores created successfully" << endl << flush;
 
     /**************************************************************************************/
     /* Tasks creation                                                                     */
     /**************************************************************************************/
-    if (err = rt_task_create(&th_server, "th_server", 0, PRIORITY_TSERVER, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_sendToMon, "th_sendToMon", 0, PRIORITY_TSENDTOMON, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_receiveFromMon, "th_receiveFromMon", 0, PRIORITY_TRECEIVEFROMMON, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_openComRobot, "th_openComRobot", 0, PRIORITY_TOPENCOMROBOT, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_startRobot, "th_startRobot", 0, PRIORITY_TSTARTROBOT, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_move, "th_move", 0, PRIORITY_TMOVE, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_create(&th_battery, "th_battery", 0, PRIORITY_TBATTERY, 0)) {
-        cerr << "Error task create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    CreateTask(&th_server, "th_server", PRIORITY_TSERVER);
+    CreateTask(&th_sendToMon, "th_sendToMon", PRIORITY_TSENDTOMON);
+    CreateTask(&th_receiveFromMon, "th_receiveFromMon", PRIORITY_TRECEIVEFROMMON);
+    CreateTask(&th_openComRobot, "th_openComRobot", PRIORITY_TOPENCOMROBOT);
+    CreateTask(&th_startRobot, "th_startRobot", PRIORITY_TSTARTROBOT);
+    CreateTask(&th_move, "th_move", PRIORITY_TMOVE);
+    CreateTask(&th_battery, "th_battery", PRIORITY_TBATTERY);
     cout << "Tasks created successfully" << endl << flush;
 
     /**************************************************************************************/
     /* Message queues creation                                                            */
     /**************************************************************************************/
-    if ((err = rt_queue_create(&q_messageToMon, "q_messageToMon", sizeof (Message*)*50, Q_UNLIMITED, Q_FIFO)) < 0) {
-        cerr << "Error msg queue create: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    CreateQueue(&q_messageToMon, "q_messageToMon");
     cout << "Queues created successfully" << endl << flush;
 
 }
@@ -146,36 +95,14 @@ void Tasks::Init() {
  */
 void Tasks::Run() {
     rt_task_set_priority(NULL, T_LOPRIO);
-    int err;
-
-    if (err = rt_task_start(&th_server, (void(*)(void*)) & Tasks::ServerTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_sendToMon, (void(*)(void*)) & Tasks::SendToMonTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_receiveFromMon, (void(*)(void*)) & Tasks::ReceiveFromMonTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_openComRobot, (void(*)(void*)) & Tasks::OpenComRobot, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_startRobot, (void(*)(void*)) & Tasks::StartRobotTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_move, (void(*)(void*)) & Tasks::MoveTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
-    if (err = rt_task_start(&th_battery, (void(*)(void*)) & Tasks::BatteryTask, this)) {
-        cerr << "Error task start: " << strerror(-err) << endl << flush;
-        exit(EXIT_FAILURE);
-    }
+    
+    RunTask(&th_server,         (void(*)(void*)) & Tasks::ServerTask);
+    RunTask(&th_sendToMon,      (void(*)(void*)) & Tasks::SendToMonTask);
+    RunTask(&th_receiveFromMon, (void(*)(void*)) & Tasks::ReceiveFromMonTask);
+    RunTask(&th_openComRobot,   (void(*)(void*)) & Tasks::OpenComRobot);
+    RunTask(&th_startRobot,     (void(*)(void*)) & Tasks::StartRobotTask);
+    RunTask(&th_move,           (void(*)(void*)) & Tasks::MoveTask);
+    RunTask(&th_battery,        (void(*)(void*)) & Tasks::BatteryTask);
 
     cout << "Tasks launched" << endl << flush;
 }
@@ -426,7 +353,7 @@ void Tasks::BatteryTask(void *arg) {
             }
         }
     }
-
+}
 /**
  * Write a message in a given queue
  * @param queue Queue identifier
@@ -458,4 +385,38 @@ Message *Tasks::ReadInQueue(RT_QUEUE *queue) {
 
     return msg;
 }
+
+void Tasks::CreateMutex(RT_MUTEX *mutex) {
+    if (int err = rt_mutex_create(mutex, NULL)) {
+        cerr << "Error mutex create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Tasks::CreateSemaphore(RT_SEM *sem) {
+    if (int err = rt_sem_create(sem, NULL, 0, S_FIFO)) {
+        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+}
+
+ void Tasks::CreateTask(RT_TASK *task, const char *name, int priority) {
+    if (int err = rt_task_create(task, name, 0, priority, 0)) {
+        cerr << "Error task create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Tasks::CreateQueue(RT_QUEUE *queue, const char *name) {
+    if (int err = rt_queue_create(queue, name, sizeof (Message*)*50, Q_UNLIMITED, Q_FIFO)) {
+        cerr << "Error msg queue create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Tasks::RunTask(RT_TASK *task, void(* entry)(void *)) {
+    if (int err = rt_task_start(task, entry, this)) {
+        cerr << "Error task start: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
 }

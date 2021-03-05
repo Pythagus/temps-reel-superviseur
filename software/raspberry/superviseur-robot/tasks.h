@@ -103,6 +103,28 @@ private:
     /**********************************************************************/
     /* Tasks' functions                                                   */
     /**********************************************************************/
+    
+    /**
+     * @brief Helper method, exits on error
+     */
+    static void CreateMutex(RT_MUTEX *mutex);
+    /**
+     * @brief Helper method, exits on error
+     */
+    static void CreateSemaphore(RT_SEM *sem);
+    /**
+     * @brief Helper method, exits on error
+     */
+    static void CreateTask(RT_TASK *task, const char *name, int priority);
+    /**
+     * @brief Helper method, exits on error
+     */
+    static void CreateQueue(RT_QUEUE *queue, const char *name);
+    /**
+     * @brief Helper method, exits on error
+     */
+    void RunTask(RT_TASK *task, void(* entry)(void *));
+    
     /**
      * @brief Thread handling server communication with the monitor.
      */
