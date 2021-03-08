@@ -89,6 +89,7 @@ private:
      * 1 : with watchdog.
      */
     int startMode ;
+    int compteurMsgError=0;
     
     /**********************************************************************/
     /* Tasks                                                              */
