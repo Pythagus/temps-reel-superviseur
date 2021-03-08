@@ -64,6 +64,7 @@ void Tasks::Init() {
     CreateMutex(&mutex_camera);
     CreateMutex(&mutex_isImagePeriodic);
     CreateMutex(&mutex_imageMode);
+    CreateMutex(&mutex_lostMessagesCnt);
     cout << "Mutexes created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -523,17 +524,45 @@ Message * Tasks::WriteToRobot(Message * message) {
     Message* response = this->robot.Write(message);
     rt_mutex_release(&mutex_robot);
     
+    rt_mutex_acquire(&mutex_lostMessagesCnt, TM_INFINITE);
+    
     if(response->CompareID(MESSAGE_ANSWER_ROBOT_TIMEOUT)) {
         this->lostMessagesCnt++;
         
+        // The connection was lost.
         if(this->lostMessagesCnt >= MAX_LOST_MESSAGES) {
-            throw std::runtime_error{"Com Robot Lost"} ;
+            // un message spécifique doit être envoyé au moniteur. 
+            // Le système doit fermer la communicationentre le robot et le 
+            // superviseur et se remettre dans un état initial permettant de relancer la communication.
+            
+            // Send a stop (movement) order.
+            //WriteToRobot(MESSAGE_ROBOT_STOP) ;
+            
+            // Send a lost message to the monitor.
+            //Tasks::CloseRobotCommunication() ;
+            
+            // 
         }
     } else {
         this->lostMessagesCnt = 0 ;
     }
     
+    rt_mutex_release(&mutex_robot) ;
+    
     return response ;
+}
+
+/**
+ * @brief Close the communication with the robot.
+ */
+void Tasks::CloseRobotCommunication() {
+    rt_mutex_acquire(&mutex_robot, TM_INFINITE) ;
+    int closeStatus = this->robot.Close() ;
+    rt_mutex_release(&mutex_robot) ;
+
+    if(closeStatus != 0) {
+        cout << "[ERROR] Close robot failed" << endl ;
+    }
 }
 
 /**
