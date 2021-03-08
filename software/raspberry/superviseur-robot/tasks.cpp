@@ -301,15 +301,12 @@ void Tasks::StartRobotTask(void *arg) {
             cout << "Start robot with watchdog (";
         }
 
-        rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-
         if (mode == START_WITHOUT_WD) {
-            msgSend = robot.Write(robot.StartWithoutWD());
+            msgSend = WriteToRobot(robot.StartWithoutWD());
         } else {
-            msgSend = robot.Write(robot.StartWithWD());
+            msgSend = WriteToRobot(robot.StartWithWD());
         }
 
-        rt_mutex_release(&mutex_robot);
         cout << msgSend->GetID();
         cout << ")" << endl;
 
@@ -356,9 +353,7 @@ void Tasks::MoveTask(void *arg) {
 
             cout << " move: " << cpMove;
 
-            rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-            robot.Write(new Message((MessageID) cpMove));
-            rt_mutex_release(&mutex_robot);
+            WriteToRobot((MessageID) cpMove) ;
         }
         cout << endl << flush;
     }
@@ -389,9 +384,7 @@ void Tasks::BatteryTask(void *arg) {
 
         // Waiting for robot started.
         if (rs == 1) {
-            rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-            Message * response = robot.Write(new Message(MESSAGE_ROBOT_BATTERY_GET));
-            rt_mutex_release(&mutex_robot);
+            Message * response = WriteToRobot(MESSAGE_ROBOT_BATTERY_GET) ;
 
             if (response->CompareID(MESSAGE_ROBOT_BATTERY_LEVEL)) {
                 WriteInQueue(&q_messageToMon, response);
@@ -508,38 +501,39 @@ void Tasks::ReloadTask(void * arg) {
 
         // Waiting for robot started and a WD start.
         if ((rs == 1) && (this->startMode == START_WITH_WD)) {
-            rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-            this->robot.Write(new Message(MESSAGE_ROBOT_RELOAD_WD));
-            rt_mutex_release(&mutex_robot);
-            cout << "Reload message sent" << endl;
+            WriteToRobot(MESSAGE_ROBOT_RELOAD_WD) ;
+            cout << "Reload message sent" << endl << flush ;
         }
     }
 }
 
-Message * WriteToRobot(Message * message) {
+/**
+ * @brief Write a message to the robot.
+ */
+Message * Tasks::WriteToRobot(MessageID messageId) {
+    return this->WriteToRobot(new Message(messageId)) ;
+}
 
+
+/**
+ * @brief Write a message to the robot.
+ */
+Message * Tasks::WriteToRobot(Message * message) {
     rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-    Message* msg = this->robot.Write(message);
+    Message* response = this->robot.Write(message);
     rt_mutex_release(&mutex_robot);
     
-    if(msg->compareID(MESSAGE_ANSWER_ROBOT_TIMEOUT)){
+    if(response->CompareID(MESSAGE_ANSWER_ROBOT_TIMEOUT)) {
+        this->lostMessagesCnt++;
         
-        compteurMsgError++;
-        
-        if(compteurMsgError>=3){
-            
-            cout << "Com Robot Lost" <<  endl << flush;
-            
-            exit();
-               
+        if(this->lostMessagesCnt >= MAX_LOST_MESSAGES) {
+            throw std::runtime_error{"Com Robot Lost"} ;
         }
-        
-        
+    } else {
+        this->lostMessagesCnt = 0 ;
     }
     
-    return msg;
-    
-    
+    return response ;
 }
 
 /**

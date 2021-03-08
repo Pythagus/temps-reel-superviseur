@@ -42,6 +42,8 @@
 #define START_WITHOUT_WD 0
 #define START_WITH_WD    1
 
+#define MAX_LOST_MESSAGES 3
+
 /**
  * Enumerate for image mode
  */
@@ -89,7 +91,7 @@ private:
      * 1 : with watchdog.
      */
     int startMode ;
-    int compteurMsgError=0;
+    int lostMessagesCnt = 0;
     
     /**********************************************************************/
     /* Tasks                                                              */
@@ -223,6 +225,16 @@ private:
      * @return Message read
      */
     Message *ReadInQueue(RT_QUEUE *queue);
+    
+    /**
+    * @brief Write a message to the robot.
+    */
+    Message * WriteToRobot(Message * message) ;
+    
+    /**
+    * @brief Write a message to the robot.
+    */
+    Message * WriteToRobot(MessageID messageId) ;
 
 };
 
