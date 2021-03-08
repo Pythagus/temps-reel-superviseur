@@ -1,0 +1,33 @@
+@startuml
+skinparam monochrome true
+start
+
+while()
+
+while (not cameraOpened)
+:openCamera?;
+:cameraOpened = camera.Open();
+if (cameraOpened) then (true)
+:message = Message(MESSAGE_ANSWER_ACK);
+else
+:message = Message(MESSAGE_ANSWER_NACK);
+endif
+:messageToMon!message;
+endwhile
+
+while (cameraOpened)
+:closeCamera?;
+:camera.Close();
+:cameraOpened = camera.IsOpen();
+if (not cameraOpened) then (true)
+:message = Message(MESSAGE_ANSWER_ACK);
+else
+:message = Message(MESSAGE_ANSWER_NACK);
+endif
+:messageToMon!message;
+endwhile
+
+endwhile
+
+stop
+@enduml
