@@ -7,17 +7,17 @@ while ()
 if (isImagePeriodic) then (true)
 :image = camera.Grab();
 
-if (imageMode = IMAGEMODE_IMG_POS) then (true)
+if (imageMode) then (IMAGEMODE_IMG_POS)
 :position = image.SearchRobot(arena);
 
-if (position != null) then (true)
+if (position) then
 :image = image.DrawRobot(position);
 :messageToMon!MessagePosition(position);
-else
+else (null)
 :messageToMon!MessagePosition();
 endif
 
-else
+else (IMAGEMODE_IMG)
 endif
 
 :messageToMon!MessageImage(image);
