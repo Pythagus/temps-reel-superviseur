@@ -65,3 +65,7 @@ GUI
 /software/raspberry/superviseur-robot/superviseur/dist/
 /software/raspberry/testeur/testeur/build/
 /software/raspberry/testeur/testeur/dist/
+
+
+# CUSTOM IGNORED
+/software/raspberry/superviseur-robot/nbproject

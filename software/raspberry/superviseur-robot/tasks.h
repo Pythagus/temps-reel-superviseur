@@ -20,6 +20,7 @@
 
 #include <unistd.h>
 #include <iostream>
+#include <sstream>
 
 #include <sys/mman.h>
 #include <alchemy/task.h>
@@ -36,6 +37,10 @@
 
 #define CAMERA_SIZE sm
 #define CAMERA_FPS 20
+
+// Start mode values.
+#define START_WITHOUT_WD 0
+#define START_WITH_WD    1
 
 /**
  * Enumerate for image mode
@@ -78,6 +83,13 @@ private:
     int isImagePeriodic = 0;
     int imageMode = IMAGEMODE_IMG;
     
+    /**
+     * Start mode value.
+     * 0 : without watchdog
+     * 1 : with watchdog.
+     */
+    int startMode ;
+    
     /**********************************************************************/
     /* Tasks                                                              */
     /**********************************************************************/
@@ -90,6 +102,7 @@ private:
     RT_TASK th_battery;
     RT_TASK th_camera;
     RT_TASK th_image;
+    RT_TASK th_reload;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -187,6 +200,11 @@ private:
      * @brief Thread sending an image to the monitor.
      */
     void ImageTask(void *arg);
+
+     /**
+     * @brief Thread sending an image to the monitor.
+     */
+    void ReloadTask(void *arg);
     
     /**********************************************************************/
     /* Queue services                                                     */

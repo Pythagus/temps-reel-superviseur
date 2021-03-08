@@ -19,15 +19,16 @@
 #include <stdexcept>
 
 // Déclaration des priorités des taches
-#define PRIORITY_TSERVER 30
-#define PRIORITY_TOPENCOMROBOT 20
-#define PRIORITY_TMOVE 20
-#define PRIORITY_TSENDTOMON 22
-#define PRIORITY_TRECEIVEFROMMON 25
-#define PRIORITY_TSTARTROBOT 20
+#define PRIORITY_TSERVER 99
+#define PRIORITY_TOPENCOMROBOT 50
+#define PRIORITY_TMOVE 35
+#define PRIORITY_TSENDTOMON 70
+#define PRIORITY_TRECEIVEFROMMON 70
+#define PRIORITY_TSTARTROBOT 50
 #define PRIORITY_TBATTERY 10
-#define PRIORITY_TCAMERA 19
-#define PRIORITY_TIMAGE 12
+#define PRIORITY_TCAMERA 30
+#define PRIORITY_TIMAGE 15
+#define PRIORITY_RELOAD 40
 
 /*
  * Some remarks:
@@ -88,6 +89,7 @@ void Tasks::Init() {
     CreateTask(&th_battery, "th_battery", PRIORITY_TBATTERY);
     CreateTask(&th_camera, "th_camera", PRIORITY_TCAMERA);
     CreateTask(&th_image, "th_image", PRIORITY_TIMAGE);
+    CreateTask(&th_reload, "th_reload", PRIORITY_RELOAD);
     cout << "Tasks created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -112,7 +114,7 @@ void Tasks::Run() {
     RunTask(&th_move,           (void(*)(void*)) & Tasks::MoveTask);
     RunTask(&th_battery,        (void(*)(void*)) & Tasks::BatteryTask);
     RunTask(&th_camera,         (void(*)(void*)) & Tasks::CameraTask);
-    RunTask(&th_image,          (void(*)(void*)) & Tasks::ImageTask);
+    RunTask(&th_image,          (void(*)(void*)) & Tasks::ImageTask) ;
 
     cout << "Tasks launched" << endl << flush;
 }
@@ -211,6 +213,10 @@ void Tasks::ReceiveFromMonTask(void *arg) {
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
             rt_sem_v(&sem_openComRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
+            this->startMode = START_WITHOUT_WD ;
+            rt_sem_v(&sem_startRobot);
+        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
+            this->startMode = START_WITH_WD ;
             rt_sem_v(&sem_startRobot);
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
                 msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
@@ -276,12 +282,33 @@ void Tasks::StartRobotTask(void *arg) {
     /* The task startRobot starts here                                                    */
     /**************************************************************************************/
     while (1) {
-
         Message * msgSend;
         rt_sem_p(&sem_startRobot, TM_INFINITE);
-        cout << "Start robot without watchdog (";
-        rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-        msgSend = robot.Write(robot.StartWithoutWD());
+        
+        // Robot start mode.
+        int mode = this->startMode ;
+        
+        // If it is an unknown mode.
+        if(mode != START_WITHOUT_WD && mode != START_WITH_WD) {
+            ostringstream oss;
+            oss << "Unknown start mode " << mode;
+            throw std::runtime_error{oss.str()};
+        }
+        
+        if(mode == START_WITHOUT_WD) {
+             cout << "Start robot without watchdog (" ;
+        } else {
+             cout << "Start robot with watchdog (" ;
+        }
+        
+        rt_mutex_acquire(&mutex_robot, TM_INFINITE) ;
+        
+        if(mode == START_WITHOUT_WD) {
+            msgSend = robot.Write(robot.StartWithoutWD()) ;
+        } else {
+            msgSend = robot.Write(robot.StartWithWD()) ;
+        }
+        
         rt_mutex_release(&mutex_robot);
         cout << msgSend->GetID();
         cout << ")" << endl;
@@ -293,6 +320,9 @@ void Tasks::StartRobotTask(void *arg) {
             rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
             robotStarted = 1;
             rt_mutex_release(&mutex_robotStarted);
+            
+            // Start the reload task.
+            RunTask(&th_reload, (void(*)(void*)) & Tasks::ReloadTask) ;
         }
     }
 }
@@ -453,6 +483,35 @@ void Tasks::ImageTask(void *arg) {/*
             }
         }
     }*/
+}
+
+/**
+ * @brief Thread sending periodically watchdog reload to the robot.
+ * @warning This thread should be started after barrier synchronization. 
+ * The robot should be started.
+*/
+void Tasks::ReloadTask(void * arg) {
+    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush ;
+    
+    rt_task_set_periodic(NULL, TM_NOW, 1000000000) ; // 1000ms = 1e9 ns
+    
+    int rs ;
+    while (1) {
+        rt_task_wait_period(NULL);
+        
+        // Get the robot starting status.
+        rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+        rs = robotStarted;
+        rt_mutex_release(&mutex_robotStarted);
+        
+        // Waiting for robot started and a WD start.
+        if ((rs == 1) && (this->startMode == START_WITH_WD)) {
+            rt_mutex_acquire(&mutex_robot, TM_INFINITE) ;
+            this->robot.Write(new Message(MESSAGE_ROBOT_RELOAD_WD)) ;
+            rt_mutex_release(&mutex_robot) ;
+            cout << "Reload message sent" << endl ;
+        }
+    }
 }
 
 /**
