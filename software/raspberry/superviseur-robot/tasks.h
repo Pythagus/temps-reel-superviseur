@@ -117,6 +117,7 @@ private:
     RT_MUTEX mutex_camera;
     RT_MUTEX mutex_isImagePeriodic;
     RT_MUTEX mutex_imageMode;
+    RT_MUTEX mutex_lostMessagesCnt;
 
     /**********************************************************************/
     /* Semaphores                                                         */
@@ -235,6 +236,11 @@ private:
     * @brief Write a message to the robot.
     */
     Message * WriteToRobot(MessageID messageId) ;
+    
+    /**
+     * @brief Close the communication with the robot.
+     */
+    void CloseRobotCommunication() ;
 
 };
 
