@@ -1,0 +1,14 @@
+@startuml
+skinparam monochrome true
+start
+:start_period(500 ms);
+while()
+:wait_next_period;
+if(startRobot?) then (true)
+:msg = WriteToRobot(MESSAGE_ROBOT_BATTERY_GET);
+:messageToMon!msg;
+else(false)
+endif
+endwhile
+stop
+@enduml
