@@ -374,6 +374,8 @@ void Tasks::BatteryTask(void *arg) {
 * @brief Thread opening and closing the camera.
 */
 void Tasks::CameraTask(void *arg) {
+    Message message;
+    
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
     rt_sem_p(&sem_barrier, TM_INFINITE);
@@ -389,30 +391,30 @@ void Tasks::CameraTask(void *arg) {
             rt_sem_p(&sem_startCamera, TM_INFINITE);
 
             rt_mutex_acquire(&mutex_camera, TM_INFINITE);
-            bool status = camera.Open();
+            bool cameraOpened = camera.Open();
             rt_mutex_release(&mutex_camera);
         
-            if (status) {
-                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ACK));
-                cameraOpened = true;
+            if (cameraOpened) {
+                message = Message(MESSAGE_ANSWER_ACK);
             } else {
-                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_NACK));
+                message = Message(MESSAGE_ANSWER_NACK);
             }
+            WriteInQueue(&q_messageToMon, &message);
         }
         while (cameraOpened) {
             rt_sem_p(&sem_closeCamera, TM_INFINITE);
 
             rt_mutex_acquire(&mutex_camera, TM_INFINITE);
             camera.Close();
-            bool status = not camera.IsOpen();
+            bool cameraOpened = camera.IsOpen();
             rt_mutex_release(&mutex_camera);
         
-            if (status) {
-                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ACK));
-                cameraOpened = false;
+            if (not cameraOpened) {
+                message = Message(MESSAGE_ANSWER_ACK);
             } else {
-                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_NACK));
+                message = Message(MESSAGE_ANSWER_NACK);
             }
+            WriteInQueue(&q_messageToMon, &message);
         }
     }
 }
