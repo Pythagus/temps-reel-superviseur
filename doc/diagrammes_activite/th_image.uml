@@ -1,0 +1,29 @@
+@startuml
+skinparam monochrome true
+start
+:start_period(100 ms);
+while ()
+:wait_next_period();
+if (isImagePeriodic) then (true)
+:image = camera.Grab();
+
+if (imageMode = IMAGEMODE_IMG_POS) then (true)
+:position = image.SearchRobot(arena);
+
+if (position != null) then (true)
+:image = image.DrawRobot(position);
+:messageToMon!MessagePosition(position);
+else
+:messageToMon!MessagePosition();
+endif
+
+else
+endif
+
+:messageToMon!MessageImage(image);
+
+else
+endif
+endwhile
+stop
+@enduml
