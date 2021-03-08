@@ -520,10 +520,12 @@ Message * Tasks::WriteToRobot(MessageID messageId) {
  * @brief Write a message to the robot.
  */
 Message * Tasks::WriteToRobot(Message * message) {
+    // Send the message to the robot.
     rt_mutex_acquire(&mutex_robot, TM_INFINITE);
     Message* response = this->robot.Write(message);
     rt_mutex_release(&mutex_robot);
     
+    // Check the error counter.
     rt_mutex_acquire(&mutex_lostMessagesCnt, TM_INFINITE);
     
     if(response->CompareID(MESSAGE_ANSWER_ROBOT_TIMEOUT)) {
@@ -531,23 +533,27 @@ Message * Tasks::WriteToRobot(Message * message) {
         
         // The connection was lost.
         if(this->lostMessagesCnt >= MAX_LOST_MESSAGES) {
-            // un message spécifique doit être envoyé au moniteur. 
-            // Le système doit fermer la communicationentre le robot et le 
-            // superviseur et se remettre dans un état initial permettant de relancer la communication.
-            
-            // Send a stop (movement) order.
-            //WriteToRobot(MESSAGE_ROBOT_STOP) ;
+            cout << "[ERROR] Communication LOST" << endl ;
             
             // Send a lost message to the monitor.
-            //Tasks::CloseRobotCommunication() ;
+            WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_ROBOT_TIMEOUT)) ;
             
-            // 
+            // Stop the robot for all the threads.
+            rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+            this->robotStarted = 0 ;
+            rt_mutex_release(&mutex_robotStarted);
+            
+            // Close the communication with the robot.
+            Tasks::CloseRobotCommunication() ;
+            
+            // Reopen the communication.
+            rt_sem_v(&sem_openComRobot) ;
         }
     } else {
         this->lostMessagesCnt = 0 ;
     }
     
-    rt_mutex_release(&mutex_robot) ;
+    rt_mutex_release(&mutex_lostMessagesCnt) ;
     
     return response ;
 }

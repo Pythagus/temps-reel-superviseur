@@ -69,3 +69,4 @@ GUI
 
 # CUSTOM IGNORED
 /software/raspberry/superviseur-robot/nbproject
+/software/raspberry/superviseur-robot/nbproject/*
