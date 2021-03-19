@@ -201,40 +201,84 @@ void Tasks::ReceiveFromMonTask(void *arg) {
     /**************************************************************************************/
     /* The task receiveFromMon starts here                                                */
     /**************************************************************************************/
-    rt_sem_p(&sem_serverOk, TM_INFINITE);
-    cout << "Received message from monitor activated" << endl << flush;
+    
+    while (true)
+    {
+        rt_sem_p(&sem_serverOk, TM_INFINITE);
+        cout << "Received message from monitor activated" << endl << flush;
+        
+        bool serverOk{true};
 
-    while (1) {
-        msgRcv = monitor.Read();
-        cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
+        while (serverOk) {
+            msgRcv = monitor.Read();
+            cout << "Rcv <= " << msgRcv->ToString() << endl << flush;
 
-        if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
-            delete(msgRcv);
-            exit(-1);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
-            rt_sem_v(&sem_openComRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
-            this->startMode = START_WITHOUT_WD;
-            rt_sem_v(&sem_startRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
-            this->startMode = START_WITH_WD;
-            rt_sem_v(&sem_startRobot);
-        } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
-                msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
+            if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
+                cout << "[ReceiveFromMon] MESSAGE_MONITOR_LOST" << endl;
 
-            rt_mutex_acquire(&mutex_move, TM_INFINITE);
-            move = msgRcv->GetID();
-            rt_mutex_release(&mutex_move);
-        } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
-            cout << "[ReceiveFromMon] Received MESSAGE_CAM_OPEN" << endl;
-            rt_sem_v(&sem_startCamera);
-        } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
-            rt_sem_v(&sem_closeCamera);
+                rt_mutex_acquire(&mutex_move, TM_INFINITE);
+                move = MESSAGE_ROBOT_STOP;
+                rt_mutex_release(&mutex_move);
+
+                WriteToRobot(robot.Reset());
+
+                rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+                robotStarted = 0;
+                rt_mutex_release(&mutex_robotStarted);
+
+                CloseRobotCommunication();
+
+                rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
+                monitor.Close();
+                rt_mutex_release(&mutex_monitor);
+
+                rt_sem_v(&sem_closeCamera);
+                
+                rt_mutex_acquire(&mutex_isImagePeriodic, TM_INFINITE);
+                isImagePeriodic = 0;
+                rt_mutex_release(&mutex_isImagePeriodic);
+
+                rt_mutex_acquire(&mutex_imageMode, TM_INFINITE);
+                imageMode = IMAGEMODE_IMG;
+                rt_mutex_release(&mutex_imageMode);
+
+                rt_mutex_acquire(&mutex_lostMessagesCnt, TM_INFINITE);
+                lostMessagesCnt = 0;
+                rt_mutex_release(&mutex_lostMessagesCnt);
+
+                rt_task_create(&th_server, "th_server", 0, PRIORITY_TSERVER, 0);
+
+                rt_task_start(&th_server, (void(*)(void*)) & Tasks::ServerTask, this);
+                
+                rt_sem_v(&sem_barrier);
+
+                serverOk = false;
+
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_COM_OPEN)) {
+                rt_sem_v(&sem_openComRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) {
+                this->startMode = START_WITHOUT_WD;
+                rt_sem_v(&sem_startRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
+                this->startMode = START_WITH_WD;
+                rt_sem_v(&sem_startRobot);
+            } else if (msgRcv->CompareID(MESSAGE_ROBOT_GO_FORWARD) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_BACKWARD) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_LEFT) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
+                    msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
+
+                rt_mutex_acquire(&mutex_move, TM_INFINITE);
+                move = msgRcv->GetID();
+                rt_mutex_release(&mutex_move);
+            } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
+                cout << "[ReceiveFromMon] Received MESSAGE_CAM_OPEN" << endl;
+                rt_sem_v(&sem_startCamera);
+            } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
+                rt_sem_v(&sem_closeCamera);
+            }
+            delete(msgRcv); // mus be deleted manually, no consumer
         }
-        delete(msgRcv); // mus be deleted manually, no consumer
     }
 }
 
@@ -297,21 +341,16 @@ void Tasks::StartRobotTask(void *arg) {
         }
 
         if (mode == START_WITHOUT_WD) {
+            msgSend = WriteToRobot(robot.StartWithoutWD());
             cout << "Start robot without watchdog (";
         } else {
+            msgSend = WriteToRobot(robot.StartWithWD());
             cout << "Start robot with watchdog (";
         }
 
-        if (mode == START_WITHOUT_WD) {
-            msgSend = WriteToRobot(robot.StartWithoutWD());
-        } else {
-            msgSend = WriteToRobot(robot.StartWithWD());
-        }
+        cout << msgSend->GetID() << ")" << endl;
 
-        cout << msgSend->GetID();
-        cout << ")" << endl;
-
-        cout << "Movement answer: " << msgSend->ToString() << endl << flush;
+        cout << "Movement answer: " << msgSend->ToString() << endl;
         WriteInQueue(&q_messageToMon, msgSend); // msgSend will be deleted by sendToMon
 
         if (msgSend->GetID() == MESSAGE_ANSWER_ACK) {
@@ -319,8 +358,10 @@ void Tasks::StartRobotTask(void *arg) {
             robotStarted = 1;
             rt_mutex_release(&mutex_robotStarted);
 
-            // Start the reload task.
-            RunTask(&th_reload, (void(*)(void*)) & Tasks::ReloadTask);
+            // Start the reload task if needed.
+            if (mode == START_WITH_WD) {
+                RunTask(&th_reload, (void(*)(void*)) & Tasks::ReloadTask);
+            }
         }
     }
 }
@@ -343,7 +384,7 @@ void Tasks::MoveTask(void *arg) {
 
     while (1) {
         rt_task_wait_period(NULL);
-        cout << "Periodic movement update";
+        //cout << "Periodic movement update" << endl;
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         rs = robotStarted;
         rt_mutex_release(&mutex_robotStarted);
@@ -352,11 +393,10 @@ void Tasks::MoveTask(void *arg) {
             cpMove = move;
             rt_mutex_release(&mutex_move);
 
-            cout << " move: " << cpMove;
+            //cout << " Robot move: " << cpMove << endl;
 
             WriteToRobot((MessageID) cpMove) ;
         }
-        cout << endl << flush;
     }
 }
 
