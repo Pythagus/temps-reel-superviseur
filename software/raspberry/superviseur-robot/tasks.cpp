@@ -271,6 +271,14 @@ void Tasks::ReceiveFromMonTask(void *arg) {
                 cout << "RESET ROBOT" << endl ;
                 
                 StopRobot() ;
+            } else if(msgRcv->CompareID(MESSAGE_CAM_POSITION_COMPUTE_START)) {
+                rt_mutex_acquire(&mutex_imageMode, TM_INFINITE);
+                imageMode = IMAGEMODE_IMG_POS ;
+                rt_mutex_release(&mutex_imageMode);
+            } else if(msgRcv->CompareID(MESSAGE_CAM_POSITION_COMPUTE_STOP)) {
+                rt_mutex_acquire(&mutex_imageMode, TM_INFINITE);
+                imageMode = MESSAGE_CAM_IMAGE ;
+                rt_mutex_release(&mutex_imageMode);
             }
             
             delete(msgRcv); // mus be deleted manually, no consumer
@@ -454,12 +462,14 @@ void Tasks::CameraTask(void *arg) {
             bool cameraOpened = camera.Open();
             rt_mutex_release(&mutex_camera);
 
-            /*if (cameraOpened) {
+            if (cameraOpened) {
                 message = Message(MESSAGE_ANSWER_ACK);
             } else {
                 message = Message(MESSAGE_ANSWER_NACK);
             }
-            WriteInQueue(&q_messageToMon, &message);*/
+            
+            //monitor.Write(&message) ;
+            //WriteInQueue(&q_messageToMon, &message);
         }
         while (cameraOpened) {
             
@@ -475,7 +485,9 @@ void Tasks::CameraTask(void *arg) {
             } else {
                 message = Message(MESSAGE_ANSWER_NACK);
             }
-            WriteInQueue(&q_messageToMon, &message);
+            
+            //monitor.Write(&message) ;
+            //WriteInQueue(&q_messageToMon, &message);
         }
     }
 }
@@ -486,6 +498,7 @@ void Tasks::CameraTask(void *arg) {
 void Tasks::ImageTask(void *arg) {
     int localIsImagePeriodic;
     int localImageMode;
+    Arena * arena = new Arena() ;
     
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
@@ -509,16 +522,27 @@ void Tasks::ImageTask(void *arg) {
             localImageMode = imageMode;
             rt_mutex_release(&mutex_imageMode);
 
-            if (localImageMode == IMAGEMODE_IMG) {
-              rt_mutex_acquire(&mutex_camera, TM_INFINITE); 
-              
-              if(camera.IsOpen()){
+            MessageImg * msg ;
+            rt_mutex_acquire(&mutex_camera, TM_INFINITE); 
+            if(camera.IsOpen()) {
                 Img image = camera.Grab();
-                monitor.Write(new MessageImg(MESSAGE_CAM_IMAGE, &image));
-              }
-              
-              rt_mutex_release(&mutex_camera);
+                
+                if(localImageMode == IMAGEMODE_IMG_POS) {
+                    std::list<Position> positions = image.SearchRobot(*arena) ;
+                    image.DrawRobot(positions.front()) ;
+                    
+                    rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
+                     
+                    monitor.Write(new MessagePosition(MESSAGE_CAM_POSITION, positions.front())) ;
+                    //monitor.Write(new MessagePosition(MESSAGE_CAM_POSITION, positions.front())) ;
+                    rt_mutex_release(&mutex_monitor);
+                }
+                
+                rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
+                monitor.Write(new MessageImg(MESSAGE_CAM_IMAGE, &image)) ;
+                rt_mutex_release(&mutex_monitor) ;
             }
+            rt_mutex_release(&mutex_camera);
         }
     }
 }
