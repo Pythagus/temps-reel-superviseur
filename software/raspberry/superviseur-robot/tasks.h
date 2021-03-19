@@ -82,7 +82,7 @@ private:
     Camera camera{CAMERA_SIZE, CAMERA_FPS};
     int robotStarted = 0;
     int move = MESSAGE_ROBOT_STOP;
-    int isImagePeriodic = 0;
+    int isImagePeriodic = 1;
     int imageMode = IMAGEMODE_IMG;
     
     /**

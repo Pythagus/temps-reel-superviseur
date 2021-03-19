@@ -17,6 +17,7 @@
 
 #include "tasks.h"
 #include <stdexcept>
+#include <valarray>
 
 // Déclaration des priorités des taches
 #define PRIORITY_TSERVER 99
@@ -225,6 +226,7 @@ void Tasks::ReceiveFromMonTask(void *arg) {
                 msgRcv->CompareID(MESSAGE_ROBOT_GO_RIGHT) ||
                 msgRcv->CompareID(MESSAGE_ROBOT_STOP)) {
 
+            
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             move = msgRcv->GetID();
             rt_mutex_release(&mutex_move);
@@ -418,14 +420,15 @@ void Tasks::CameraTask(void *arg) {
             bool cameraOpened = camera.Open();
             rt_mutex_release(&mutex_camera);
 
-            if (cameraOpened) {
+            /*if (cameraOpened) {
                 message = Message(MESSAGE_ANSWER_ACK);
             } else {
                 message = Message(MESSAGE_ANSWER_NACK);
             }
-            WriteInQueue(&q_messageToMon, &message);
+            WriteInQueue(&q_messageToMon, &message);*/
         }
         while (cameraOpened) {
+            
             rt_sem_p(&sem_closeCamera, TM_INFINITE);
 
             rt_mutex_acquire(&mutex_camera, TM_INFINITE);
@@ -446,7 +449,7 @@ void Tasks::CameraTask(void *arg) {
 /**
  * @brief Thread sending an image to the monitor.
  */
-void Tasks::ImageTask(void *arg) {/*
+void Tasks::ImageTask(void *arg) {
     int localIsImagePeriodic;
     int localImageMode;
     
@@ -457,11 +460,11 @@ void Tasks::ImageTask(void *arg) {/*
     /**************************************************************************************/
     /* The task starts here                                                               */
     /**************************************************************************************/
-    /*
+
     rt_task_set_periodic(NULL, TM_NOW, 100000000); // 100ms = 1e8 ns
 
     while (1) {
-        rt_task_wait_period(NULL);
+        rt_task_wait_period(NULL);        
         
         rt_mutex_acquire(&mutex_isImagePeriodic, TM_INFINITE);
         localIsImagePeriodic = isImagePeriodic;
@@ -473,12 +476,23 @@ void Tasks::ImageTask(void *arg) {/*
             rt_mutex_release(&mutex_imageMode);
 
             if (localImageMode == IMAGEMODE_IMG) {
-
-            } else if (localImageMode == IMAGEMODE_IMG_POS) {
-
+              
+              rt_mutex_acquire(&mutex_camera, TM_INFINITE); 
+              
+              if(camera.IsOpen()){
+              cout << "Image Grabed1" << endl << flush;
+              Img image = camera.Grab();
+              cout << "Image Grabed2" << endl << flush;
+              monitor.Write(new MessageImg(MESSAGE_CAM_IMAGE, &image));
+              //WriteInQueue(&q_messageToMon, new MessageImg(MESSAGE_CAM_IMAGE, &image));
+              }
+              rt_mutex_release(&mutex_camera);
+             
+              
+                
             }
         }
-    }*/
+    }
 }
 
 /**
