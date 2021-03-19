@@ -1,0 +1,36 @@
+@startuml
+skinparam monochrome true
+start
+
+While ()
+
+if (MESSAGE_CAM_ASK_ARENA) then (true)
+: isImagePeriodic = false ; 
+: image = camera.Grab() ;
+: arena = SearchArena(image) ; 
+
+
+if (arena = NULL) then(true)
+:message = Message(MESSAGE_ANSWER_NACK);
+else 
+: image = DrawArena(image,arena);
+: messageToMon!MessageImage(image);
+
+endif
+
+
+if (message?) then (MESSAGE_CAM_ARENA_CONFIRM)
+: save arena ;
+else (MESSAGE_CAM_ARENA_INFIRM) 
+: delete arena ; 
+
+
+endif 
+endif
+: isImagePeriodic = true ; 
+
+
+endwhile
+
+stop
+@enduml

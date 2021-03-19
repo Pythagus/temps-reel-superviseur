@@ -1,0 +1,22 @@
+
+@startuml
+skinparam monochrome true
+start
+
+:start_period(1000 ms);
+
+While ()
+
+:wait_next_period();
+
+
+if (roboStarted && startMode = START_WITH_WD) then (true)
+
+:msg = WriteToRobot(MESSAGE_ROBOT_RELOAD_WD);
+
+endif
+endwhile
+
+stop
+@enduml
+
