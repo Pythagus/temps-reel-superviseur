@@ -216,16 +216,7 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             if (msgRcv->CompareID(MESSAGE_MONITOR_LOST)) {
                 cout << "[ReceiveFromMon] MESSAGE_MONITOR_LOST" << endl;
 
-                rt_mutex_acquire(&mutex_move, TM_INFINITE);
-                move = MESSAGE_ROBOT_STOP;
-                rt_mutex_release(&mutex_move);
-
-                WriteToRobot(robot.Reset());
-
-                rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
-                robotStarted = 0;
-                rt_mutex_release(&mutex_robotStarted);
-
+                StopRobot() ;
                 CloseRobotCommunication();
 
                 rt_mutex_acquire(&mutex_monitor, TM_INFINITE);
@@ -276,7 +267,12 @@ void Tasks::ReceiveFromMonTask(void *arg) {
                 rt_sem_v(&sem_startCamera);
             } else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
                 rt_sem_v(&sem_closeCamera);
+            } else if(msgRcv->CompareID(MESSAGE_ROBOT_RESET)) {
+                cout << "RESET ROBOT" << endl ;
+                
+                StopRobot() ;
             }
+            
             delete(msgRcv); // mus be deleted manually, no consumer
         }
     }
@@ -514,20 +510,14 @@ void Tasks::ImageTask(void *arg) {
             rt_mutex_release(&mutex_imageMode);
 
             if (localImageMode == IMAGEMODE_IMG) {
-              
               rt_mutex_acquire(&mutex_camera, TM_INFINITE); 
               
               if(camera.IsOpen()){
-              cout << "Image Grabed1" << endl << flush;
-              Img image = camera.Grab();
-              cout << "Image Grabed2" << endl << flush;
-              monitor.Write(new MessageImg(MESSAGE_CAM_IMAGE, &image));
-              //WriteInQueue(&q_messageToMon, new MessageImg(MESSAGE_CAM_IMAGE, &image));
+                Img image = camera.Grab();
+                monitor.Write(new MessageImg(MESSAGE_CAM_IMAGE, &image));
               }
-              rt_mutex_release(&mutex_camera);
-             
               
-                
+              rt_mutex_release(&mutex_camera);
             }
         }
     }
@@ -558,6 +548,24 @@ void Tasks::ReloadTask(void * arg) {
             cout << "Reload message sent" << endl << flush ;
         }
     }
+}
+
+/**
+ * Stop the robot.
+ * 
+ * @param queue
+ * @return 
+ */
+void Tasks::StopRobot() {
+    rt_mutex_acquire(&mutex_move, TM_INFINITE) ;
+    move = MESSAGE_ROBOT_STOP ;
+    rt_mutex_release(&mutex_move) ;
+
+    WriteToRobot(robot.Reset()) ;
+
+    rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE) ;
+    robotStarted = 0 ;
+    rt_mutex_release(&mutex_robotStarted) ;
 }
 
 /**
