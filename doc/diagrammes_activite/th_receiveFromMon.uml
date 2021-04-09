@@ -1,0 +1,58 @@
+@startuml
+skinparam monochrome true
+start
+:serverOk?;
+while ()
+  :msgRcv = monitor.Read();
+  if (msgRcv.CompareID(MESSAGE_MONITOR_LOST)) then (true)
+    :StopRobot();
+    :CloseRobotCommunication();
+    :monitor.Close();
+    :isImagePeriodic = 0;
+    :imageMode = IMAGEMODE_IMG;
+    :lostMessageCnt = 0;
+    :start(&th_server);
+    :barrier!;
+    :serverOk = false;
+  else (false)
+    if (msgRcv.CompareID(MESSAGE_ROBOT_COM_OPEN)) then (true)
+      :openComRobot!;
+    else (false)
+      if (msgRcv.CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) then (true)
+        :startMode = START_WITHOUT_WD;
+        :startRobot!;
+      else (false)
+        if (msgRcv.CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)) then (true)
+          :startMode = START_WITH_WD;
+          :startRobot!;
+        else (false)
+          if (msgRcv.CompareID(MESSAGE_ROBOT_GO_FORWARD)\n|| msgRcv.CompareID(MESSAGE_ROBOT_GO_BACKWARD)\n|| msgRcv.CompareID(MESSAGE_ROBOT_GO_LEFT)\n|| msgRcv.CompareID(MESSAGE_ROBOT_GO_RIGHT)\n|| msgRcv.CompareID(MESSAGE_ROBOT_STOP)) then (true)
+            :move = msg.GetId();
+          else (false)
+            if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) then (true)
+              :startCamera!;
+            else (false)
+              if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) then (true)
+                :closeCamera!;
+              else (false)
+                if (msgRcv->CompareID(MESSAGE_ROBOT_RESET)) then (true)
+                  :StopRobot();
+                else (false)
+                  if (msgRcv->CompareID(MESSAGE_CAM_POSITION_COMPUTE_START)) then (true)
+                    :imageMode = IMAGEMODE_IMG_POS;
+                  else (false)
+                    if (msgRcv->CompareID(MESSAGE_CAM_POSITION_COMPUTE_STOP)) then (true)
+                      :imageMode = MESSAGE_CAM_IMAGE;
+                    endif
+                  endif
+                endif
+              endif
+            endif
+          endif
+        endif
+      endif
+    endif
+  endif
+endwhile
+stop
+@enduml
