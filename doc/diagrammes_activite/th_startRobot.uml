@@ -1,0 +1,14 @@
+@startuml
+skinparam monochrome true
+start
+while ()
+  :startRobot?;
+  :msgSend = robot.Write(new Message(this->startMode));
+  :messageToMon!msgSend;
+  if (msgSend->getId()) then (MESSAGE_ANSWER_ACK)
+    :robotStarted = true;
+    :startThread(th_reload);
+  endif
+endwhile
+stop
+@enduml
