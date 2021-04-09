@@ -1,0 +1,29 @@
+@startuml
+skinparam monochrome true
+start
+:start_period(100 ms);
+while ()
+:wait_next_period();
+:localIsImagePeriodic = isImagePeriodic;
+if (localIsImagePeriodic) then (true)
+:localImageMode = imageMode;
+
+if (camera.IsOpen())
+:Img image = camera.Grab();
+
+if (localImageMode == IMAGEMODE_IMG_POS) then
+: std::list<Position> positions = image.SearchRobot(*arena) ;
+:image.DrawRobot(positions.front()) ;
+:messageToMon!MessagePosition();
+endif
+
+:messageToMon!MessageImage(image);
+
+else (IMAGEMODE_IMG)
+endif
+
+else
+endif
+endwhile
+stop
+@enduml
