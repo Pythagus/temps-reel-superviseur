@@ -11,15 +11,16 @@ if (localIsImagePeriodic) then (true)
 if (camera.IsOpen())
 :Img image = camera.Grab();
 
-if (localImageMode == IMAGEMODE_IMG_POS) then
+if (localImageMode == IMAGEMODE_IMG_POS) then(true)
 : std::list<Position> positions = image.SearchRobot(*arena) ;
 :image.DrawRobot(positions.front()) ;
 :messageToMon!MessagePosition();
+else (IMAGEMODE_IMG)
 endif
 
 :messageToMon!MessageImage(image);
 
-else (IMAGEMODE_IMG)
+
 endif
 
 else
